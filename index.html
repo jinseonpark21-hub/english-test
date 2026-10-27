@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>영어 받아쓰기 도우미</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Gothic:wght@400;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: chalkboard-green stage on top (what's being read), word list below as a numbered answer sheet */
+:root{
+  --bg:#f3f5f1; --paper:#ffffff; --ink:#1d2a24; --muted:#5f6e66; --line:#d8dfd9;
+  --board:#24453a; --board-ink:#eef5ef; --chalk:#f2d16b; --accent:#2f6b55; --accent-ink:#ffffff;
+  --display:"Gowun Dodum","Nanum Gothic",sans-serif; --body:"Nanum Gothic","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121815; --paper:#1a221e; --ink:#e4ece6; --muted:#9aa9a0; --line:#2c3832;
+  --board:#1d3a30; --board-ink:#eef5ef; --chalk:#f2d16b; --accent:#5fb08f; --accent-ink:#0f1a15; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121815; --paper:#1a221e; --ink:#e4ece6; --muted:#9aa9a0; --line:#2c3832;
+  --board:#1d3a30; --board-ink:#eef5ef; --chalk:#f2d16b; --accent:#5fb08f; --accent-ink:#0f1a15; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:860px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1{font-family:var(--display);font-size:1.6rem;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
+
+.board{background:var(--board);color:var(--board-ink);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:14px;min-height:220px}
+.board .top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem;opacity:.85}
+.tag{font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase}
+.num{font-family:var(--display);font-size:2.6rem;color:var(--chalk);line-height:1}
+.now{font-size:1.7rem;font-weight:700;min-height:2.4em;word-break:break-word;text-wrap:balance}
+.now.hidden-text{letter-spacing:.3em;opacity:.5}
+.dots{display:flex;gap:8px}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--chalk)}
+.dot.on{background:var(--chalk)}
+.bar{height:6px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--chalk);transition:width .3s}
+
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-weight:700;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:10px 16px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--chalk);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+button.danger{color:#b2412e;border-color:currentColor;background:var(--paper)}
+button.danger.armed{background:#b2412e;color:#fff;border-color:#b2412e}
+
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.panel h2{font-size:1rem;margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.panel h2 small{font-weight:400;color:var(--muted);font-size:.8rem}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+@media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr)}}
+.row{display:flex;align-items:center;gap:8px;min-width:0}
+.row label{font-family:var(--mono);color:var(--muted);width:2.2em;text-align:right;font-variant-numeric:tabular-nums;flex:none}
+.row input{flex:1;min-width:0}
+.row button{padding:6px 9px;font-size:.8rem}
+.row.active input{border-color:var(--chalk);box-shadow:0 0 0 2px var(--chalk)}
+input[type=text],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.sentences .row input{font-size:.95rem}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.settings label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);min-width:0}
+.settings select{width:100%}
+.check{display:flex;align-items:center;gap:8px;font-size:.9rem}
+.gaps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.gaps{grid-template-columns:minmax(0,1fr)}}
+.gapgroup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px}
+.gapgroup h3{grid-column:1/-1;margin:0;font-size:.9rem}
+.gapgroup select{width:100%}
+.gapgroup label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);min-width:0}
+.sentences .row label{width:auto;min-width:4.6em}
+.note{font-size:.82rem;color:var(--muted);margin:0}
+.warn{font-size:.85rem;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin:0}
+@media (prefers-reduced-motion:reduce){.bar>i{transition:none}}
+</style>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>영어 받아쓰기 도우미</h1>
+    <p class="sub">단어 12개 · 문장 4개를 미국식 발음으로 차례대로 3번씩 불러줍니다.</p>
+  </header>
+
+  <section class="board" aria-live="polite">
+    <div class="top"><span class="tag" id="kind">준비</span><span id="count">0 / 16</span></div>
+    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+      <div class="num" id="num">—</div>
+      <div class="dots" id="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    </div>
+    <div class="now" id="now">시작 버튼을 누르면 1번부터 불러요.</div>
+    <div class="bar"><i id="bar"></i></div>
+  </section>
+
+  <div class="controls">
+    <button class="primary" id="start">▶ 시작</button>
+    <button id="pause" disabled>❚❚ 일시정지</button>
+    <button id="prev" disabled>◀ 이전</button>
+    <button id="next" disabled>다음 ▶</button>
+    <button id="stop" disabled>■ 처음으로</button>
+  </div>
+
+  <section class="panel">
+    <h2>설정</h2>
+    <div class="settings">
+      <label class="f">목소리 (미국 영어)<select id="voice"></select></label>
+      <label class="f">말하기 속도<select id="rate">
+        <option value="0.7">느리게</option><option value="0.85" selected>조금 느리게</option><option value="1">보통</option></select></label>
+    </div>
+    <div class="gaps">
+      <div class="gapgroup">
+        <h3>단어 쉬는 시간</h3>
+        <label class="f">반복 사이<select id="wGapRep">
+          <option value="2">2초</option><option value="3" selected>3초</option><option value="5">5초</option><option value="8">8초</option></select></label>
+        <label class="f">다음 단어 전<select id="wGapItem">
+          <option value="5">5초</option><option value="8" selected>8초</option><option value="12">12초</option><option value="15">15초</option><option value="20">20초</option></select></label>
+      </div>
+      <div class="gapgroup">
+        <h3>문장 쉬는 시간</h3>
+        <label class="f">반복 사이<select id="sGapRep">
+          <option value="3">3초</option><option value="5">5초</option><option value="8" selected>8초</option><option value="10">10초</option><option value="15">15초</option></select></label>
+        <label class="f">다음 문장 전<select id="sGapItem">
+          <option value="10">10초</option><option value="15" selected>15초</option><option value="20">20초</option><option value="30">30초</option><option value="45">45초</option></select></label>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="sayNum" checked> 매 문제 앞에 번호 말하기 (단어는 "Number one", 문장은 "Sentence one")</label>
+    <label class="check"><input type="checkbox" id="hide" checked> 시험 중 화면에 정답 숨기기 (교실 화면에 띄울 때)</label>
+    <p class="warn">네이버 사전 음성 파일은 이 페이지에서 직접 불러올 수 없어서, 기기에 있는 <b>미국 영어(en-US) 음성</b>으로 읽어요. 크롬에서는 "Google US English", 아이폰·맥에서는 "Samantha"가 네이버 미국식 발음과 가장 비슷해요.</p>
+  </section>
+
+  <section class="panel">
+    <h2>단어 12개 <small>예시가 들어 있어요. 시험 단어로 바꿔 입력하세요</small></h2>
+    <div class="grid" id="words"></div>
+  </section>
+
+  <section class="panel sentences">
+    <h2>문장 4개 <small>"Sentence one"부터 불러요</small></h2>
+    <div class="grid" id="sents" style="grid-template-columns:minmax(0,1fr)"></div>
+    <p class="note">입력한 내용은 이 브라우저에 저장돼서 다음에 열어도 남아 있어요. 오른쪽 🔊 버튼으로 하나씩 미리 들어볼 수 있어요.</p>
+  </section>
+
+  <div class="controls">
+    <button type="button" id="clearAll" class="danger">🗑 단어·문장 모두 지우기</button>
+  </div>
+</div>
+
+<script>
+const SAMPLE_W=["library","favorite","weather","different","breakfast","museum","delicious","together","beautiful","exercise","vacation","tomorrow"];
+const SAMPLE_S=["I usually go to the library after school.","What is your favorite season?","It will be sunny tomorrow.","We had a delicious breakfast together."];
+const NUM=["one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen"];
+const $=id=>document.getElementById(id);
+const synth=window.speechSynthesis;
+let saved={};try{saved=JSON.parse(localStorage.getItem("dictation")||"{}")}catch(e){}
+
+function label(n){return n<=12?n+"번":"문장 "+(n-12)}
+function mkRow(container,n,val,prefix){
+  const r=document.createElement("div");r.className="row";
+  r.innerHTML=`<label for="${prefix}${n}">${n<=12?n:"S"+(n-12)}</label><input type="text" id="${prefix}${n}" autocomplete="off" spellcheck="false"><button type="button" aria-label="${label(n)} 미리 듣기">🔊</button>`;
+  r.querySelector("input").value=val;
+  r.querySelector("input").addEventListener("input",save);
+  r.querySelector("button").addEventListener("click",()=>{synth.cancel();speak(r.querySelector("input").value)});
+  container.appendChild(r);
+}
+(saved.w||SAMPLE_W).forEach((w,i)=>mkRow($("words"),i+1,w,"w"));
+(saved.s||SAMPLE_S).forEach((s,i)=>mkRow($("sents"),i+13,s,"s"));
+function save(){try{localStorage.setItem("dictation",JSON.stringify({
+  w:[...Array(12)].map((_,i)=>$("w"+(i+1)).value),
+  s:[...Array(4)].map((_,i)=>$("s"+(i+13)).value)}))}catch(e){}}
+
+/* voices */
+let voices=[];
+function loadVoices(){
+  const all=synth.getVoices();
+  voices=all.filter(v=>/en[-_]US/i.test(v.lang));
+  if(!voices.length) voices=all.filter(v=>/^en/i.test(v.lang));
+  const pref=["Google US English","Samantha","Microsoft Aria","Microsoft Jenny","Microsoft Zira","Alex"];
+  voices.sort((a,b)=>{const ia=pref.findIndex(p=>a.name.includes(p)),ib=pref.findIndex(p=>b.name.includes(p));return (ia<0?99:ia)-(ib<0?99:ib)});
+  const sel=$("voice");const cur=sel.value;sel.innerHTML="";
+  if(!voices.length){sel.innerHTML="<option>기본 영어 음성</option>";return}
+  voices.forEach((v,i)=>{const o=document.createElement("option");o.value=i;o.textContent=v.name+" ("+v.lang+")";sel.appendChild(o)});
+  if(cur&&sel.querySelector(`option[value="${cur}"]`))sel.value=cur;
+}
+loadVoices();if(synth&&synth.onvoiceschanged!==undefined)synth.onvoiceschanged=loadVoices;
+
+function speak(text){return new Promise(res=>{
+  if(!text.trim())return res();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="en-US";u.rate=parseFloat($("rate").value);
+  const v=voices[$("voice").value];if(v)u.voice=v;
+  u.onend=u.onerror=()=>res();synth.speak(u);
+})}
+
+/* runner */
+let idx=0,run=0,paused=false;
+const items=()=>[...Array(16)].map((_,i)=>{const n=i+1;return{n,kind:n<=12?"단어":"문장",text:$((n<=12?"w":"s")+n).value.trim()}});
+function wait(sec,token){return new Promise(res=>{let left=sec*10;const t=setInterval(()=>{
+  if(token!==run){clearInterval(t);return res(false)}
+  if(!paused&&--left<=0){clearInterval(t);res(true)}},100)})}
+async function waitUnpaused(token){while(paused&&token===run)await new Promise(r=>setTimeout(r,100))}
+
+function show(it,rep){
+  $("num").textContent=it?label(it.n):"—";
+  $("kind").textContent=it?it.kind:"끝";
+  $("count").textContent=(it?it.n:16)+" / 16";
+  $("bar").style.width=((it?it.n-1:16)/16*100)+"%";
+  const hide=$("hide").checked&&it;
+  $("now").textContent=it?(hide?"• • •":it.text):"시험이 끝났어요. 수고했어요!";
+  $("now").classList.toggle("hidden-text",!!hide);
+  [...$("dots").children].forEach((d,i)=>d.classList.toggle("on",i<rep));
+  document.querySelectorAll(".row").forEach(r=>r.classList.remove("active"));
+  if(it)$((it.n<=12?"w":"s")+it.n).parentElement.classList.add("active");
+}
+async function play(from){
+  const token=++run;synth.cancel();paused=false;setBtns(true);
+  const list=items();
+  for(idx=from;idx<list.length;idx++){
+    const it=list[idx];if(!it.text)continue;
+    show(it,0);
+    const isWord=it.n<=12, p=isWord?"w":"s";
+    if($("sayNum").checked){
+      await speak(isWord?"Number "+NUM[idx]+".":"Sentence "+NUM[idx-12]+".");
+      if(!await wait(1.2,token))return;
+    }
+    for(let r=1;r<=3;r++){
+      await waitUnpaused(token);if(token!==run)return;
+      show(it,r);await speak(it.text);if(token!==run)return;
+      const g=parseFloat($(p+(r<3?"GapRep":"GapItem")).value);
+      if(!await wait(g,token))return;
+    }
+  }
+  show(null,3);await speak("That's the end of the test.");setBtns(false);
+}
+function setBtns(on){$("pause").disabled=!on;$("prev").disabled=!on;$("next").disabled=!on;$("stop").disabled=!on;$("start").disabled=on;$("pause").textContent="❚❚ 일시정지"}
+$("start").onclick=()=>play(0);
+$("pause").onclick=()=>{paused=!paused;if(paused){synth.pause();synth.cancel()}else synth.resume();$("pause").textContent=paused?"▶ 계속":"❚❚ 일시정지"};
+$("next").onclick=()=>play(Math.min(idx+1,15));
+$("prev").onclick=()=>play(Math.max(idx-1,0));
+$("stop").onclick=()=>{run++;synth.cancel();paused=false;idx=0;setBtns(false);$("num").textContent="—";$("kind").textContent="준비";$("count").textContent="0 / 16";$("bar").style.width="0";$("now").textContent="시작 버튼을 누르면 1번부터 불러요.";$("now").classList.remove("hidden-text");[...$("dots").children].forEach(d=>d.classList.remove("on"));document.querySelectorAll(".row").forEach(r=>r.classList.remove("active"))};
+let armTimer=null;
+$("clearAll").onclick=()=>{
+  const b=$("clearAll");
+  if(!b.classList.contains("armed")){
+    b.classList.add("armed");b.textContent="정말 지울까요? 한 번 더 누르세요";
+    armTimer=setTimeout(()=>{b.classList.remove("armed");b.textContent="🗑 단어·문장 모두 지우기"},4000);
+    return;
+  }
+  clearTimeout(armTimer);
+  $("stop").click();
+  document.querySelectorAll("#words input, #sents input").forEach(i=>i.value="");
+  save();
+  b.classList.remove("armed");b.textContent="지웠어요";
+  $("w1").focus();
+  setTimeout(()=>{b.textContent="🗑 단어·문장 모두 지우기"},2000);
+};
+if(!synth){$("now").textContent="이 브라우저는 음성 읽기를 지원하지 않아요. 크롬이나 사파리로 열어 주세요.";$("start").disabled=true}
+</script>
+</body>
+</html>
